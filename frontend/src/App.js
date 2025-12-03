@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+// Configurar la URL del backend según el entorno
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 function App() {
   // Estados para el botón verde (imágenes del dataset)
   const [selectedFile, setSelectedFile] = useState(null);
@@ -54,7 +57,7 @@ function App() {
     formData.append('file', selectedFile);
 
     try {
-      const response = await axios.post('http://localhost:8000/predict', formData, {
+      const response = await axios.post(`${API_URL}/predict`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -82,7 +85,7 @@ function App() {
     formData.append('file', externalFile);
 
     try {
-      const response = await axios.post('http://localhost:8000/predict-external', formData, {
+      const response = await axios.post(`${API_URL}/predict-external`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

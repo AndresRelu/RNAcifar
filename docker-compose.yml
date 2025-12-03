@@ -10,7 +10,10 @@ services:
       - cifar10-network
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
     ports:
       - "80:3000"
     depends_on:
