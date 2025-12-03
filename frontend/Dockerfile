@@ -12,8 +12,5 @@ RUN npm install
 COPY public ./public
 COPY src ./src
 
-# Exponer puerto
-EXPOSE 3000
-
 # Comando para ejecutar
 CMD ["npm", "start"]
