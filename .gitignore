@@ -21,7 +21,6 @@ package-lock.json
 .dockerignore
 
 # Model files (muy pesados para Git)
-*.pth
 *.pt
 *.h5
 *.pkl
