@@ -83,10 +83,19 @@ model = MLP()  # Usa los parámetros por defecto que coinciden con el modelo ent
 
 # Ruta del modelo (funciona tanto local como en Docker) - USA BEST_MODEL
 import os
-model_path = '/app/model/best_model.pth' if os.path.exists('/app/model/best_model.pth') else '../model/best_model.pth'
+# En Docker, el volumen monta ./model en /app/model
+model_path = '/app/model/best_model.pth'
+
+# Verificar si existe el archivo
+if not os.path.exists(model_path):
+    print(f"✗ Archivo de modelo no encontrado en: {model_path}")
+    print(f"✗ Contenido de /app/model/:")
+    if os.path.exists('/app/model'):
+        print(os.listdir('/app/model'))
+    raise FileNotFoundError(f"Modelo no encontrado: {model_path}")
 
 try:
-    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     
