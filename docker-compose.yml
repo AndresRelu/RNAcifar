@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./model:/app/model:ro
+    restart: always
+    networks:
+      - cifar10-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - cifar10-network
+
+networks:
+  cifar10-network:
+    driver: bridge

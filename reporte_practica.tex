@@ -1,0 +1,488 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{booktabs}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Clasificación de Imágenes CIFAR-10 mediante Perceptrón Multicapa: Análisis de Sobreajuste y Rendimiento en Producción}
+
+\author{\IEEEauthorblockN{Jorge Andrés López Romero}
+\IEEEauthorblockA{\textit{DICIS} \\
+\textit{Universidad de Guanajuato}\\
+\textit{Ingeniería en Datos e Inteligencia Artificial}\\
+Guanajuato, México \\
+ja.lopezromero@ugto.mx}
+}
+
+\maketitle
+
+\begin{abstract}
+Este trabajo presenta la implementación y evaluación de un Perceptrón Multicapa (MLP) para la clasificación de imágenes del dataset CIFAR-10, específicamente enfocado en cuatro clases: aviones, automóviles, barcos y camiones. Se entrenó una red neuronal con arquitectura 3072-512-256-4 utilizando 20,000 imágenes de entrenamiento y 4,000 de prueba. Los resultados revelan un caso paradigmático de sobreajuste severo, donde el modelo alcanza 96.63\% de precisión en entrenamiento pero solo 68\% en validación. A pesar de las métricas de validación deficientes, el modelo demostró un rendimiento aceptable en producción al clasificar correctamente imágenes nuevas. Este contraste se atribuye a la alta separabilidad entre las clases seleccionadas y sugiere que, para ciertos problemas prácticos, las métricas tradicionales pueden no reflejar completamente la utilidad del modelo en aplicaciones reales.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Perceptrón Multicapa, CIFAR-10, Sobreajuste, Clasificación de Imágenes, Deep Learning, Redes Neuronales
+\end{IEEEkeywords}
+
+\section{Introducción}
+La clasificación de imágenes es una tarea fundamental en visión por computadora que ha experimentado avances significativos con el desarrollo de técnicas de aprendizaje profundo. El dataset CIFAR-10 \cite{krizhevsky2009learning} se ha establecido como un benchmark estándar en la comunidad de aprendizaje automático debido a su tamaño moderado y diversidad de clases.
+
+\subsection{Propósito de la Práctica}
+El objetivo principal de esta práctica fue implementar y evaluar un Perceptrón Multicapa para la clasificación de imágenes en un subconjunto del dataset CIFAR-10. Los objetivos específicos incluyeron:
+
+\begin{itemize}
+    \item Diseñar e implementar una arquitectura MLP para procesamiento de imágenes
+    \item Entrenar el modelo con un subconjunto balanceado de clases seleccionadas
+    \item Analizar el comportamiento del modelo en términos de sobreajuste
+    \item Evaluar el rendimiento real del modelo en un entorno de producción
+    \item Comparar las métricas de validación con el desempeño práctico observado
+\end{itemize}
+
+\subsection{Motivación}
+La elección de un Perceptrón Multicapa sobre arquitecturas más complejas como Redes Neuronales Convolucionales (CNN) permitió estudiar las limitaciones de las redes completamente conectadas en tareas de visión por computadora, proporcionando insights valiosos sobre la importancia de la arquitectura en el aprendizaje de representaciones visuales.
+
+\section{Metodología}
+
+\subsection{Dataset CIFAR-10}
+
+El dataset CIFAR-10 consiste en 60,000 imágenes a color de 32×32 píxeles distribuidas en 10 clases. Para esta práctica, se seleccionó un subconjunto de 4 clases que presentan características visuales distintivas:
+
+\begin{itemize}
+    \item \textbf{Airplane (Avión)}: Objetos aéreos con alas visibles
+    \item \textbf{Automobile (Automóvil)}: Vehículos terrestres de cuatro ruedas
+    \item \textbf{Ship (Barco)}: Embarcaciones marítimas
+    \item \textbf{Truck (Camión)}: Vehículos de carga terrestre
+\end{itemize}
+
+\subsubsection{Distribución del Dataset}
+El dataset utilizado consistió en:
+
+\begin{table}[H]
+\centering
+\caption{Distribución de Imágenes por Clase}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Clase} & \textbf{Entrenamiento} & \textbf{Prueba} \\
+\midrule
+Airplane & 5,000 & 1,000 \\
+Automobile & 5,000 & 1,000 \\
+Ship & 5,000 & 1,000 \\
+Truck & 5,000 & 1,000 \\
+\midrule
+\textbf{Total} & \textbf{20,000} & \textbf{4,000} \\
+\bottomrule
+\end{tabular}
+\label{tab:dataset}
+\end{table}
+
+La distribución balanceada de clases (25\% cada una) garantizó que el modelo no desarrollara sesgos hacia ninguna categoría específica durante el entrenamiento.
+
+\subsection{Arquitectura del Modelo}
+
+Se implementó un Perceptrón Multicapa con la siguiente configuración:
+
+\begin{itemize}
+    \item \textbf{Capa de Entrada}: 3,072 neuronas (32×32×3 píxeles aplanados)
+    \item \textbf{Capa Oculta 1}: 512 neuronas + función de activación ReLU
+    \item \textbf{Capa Oculta 2}: 256 neuronas + función de activación ReLU
+    \item \textbf{Capa de Salida}: 4 neuronas (una por clase)
+\end{itemize}
+
+El modelo resultó en un total de \textbf{1,705,732 parámetros entrenables}, distribuidos de la siguiente manera:
+
+\begin{equation}
+\begin{split}
+\text{Capa 1:} & \quad 3072 \times 512 + 512 = 1,573,376 \\
+\text{Capa 2:} & \quad 512 \times 256 + 256 = 131,328 \\
+\text{Capa 3:} & \quad 256 \times 4 + 4 = 1,028 \\
+\text{Total:} & \quad 1,705,732 \text{ parámetros}
+\end{split}
+\end{equation}
+
+\subsubsection{Justificación de la Arquitectura}
+La elección de dos capas ocultas buscaba proporcionar suficiente capacidad representacional para aprender patrones complejos. Sin embargo, esta decisión resultó ser un factor contribuyente al sobreajuste observado, como se discutirá posteriormente.
+
+\subsection{Configuración del Entrenamiento}
+
+Los hiperparámetros seleccionados fueron:
+
+\begin{table}[H]
+\centering
+\caption{Hiperparámetros de Entrenamiento}
+\begin{tabular}{lc}
+\toprule
+\textbf{Parámetro} & \textbf{Valor} \\
+\midrule
+Optimizador & Adam \\
+Tasa de Aprendizaje & 0.001 \\
+Tamaño de Batch & 64 \\
+Número de Épocas & 25 \\
+Función de Pérdida & CrossEntropyLoss \\
+Dispositivo & CPU \\
+\midrule
+\textbf{Tiempo Total} & \textbf{53 min 50 seg} \\
+\bottomrule
+\end{tabular}
+\label{tab:hyperparams}
+\end{table}
+
+\subsubsection{Preprocesamiento de Datos}
+Se aplicaron las siguientes transformaciones a las imágenes:
+
+\begin{itemize}
+    \item Conversión a tensores PyTorch
+    \item Normalización de canales RGB: $\mu = 0.5$, $\sigma = 0.5$
+    \item Transformación: $x_{norm} = \frac{x - 0.5}{0.5}$
+\end{itemize}
+
+\section{Resultados}
+
+\subsection{Métricas de Entrenamiento}
+
+El modelo fue entrenado durante 25 épocas, registrando las siguientes métricas finales:
+
+\begin{table}[H]
+\centering
+\caption{Métricas Finales del Modelo}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Métrica} & \textbf{Entrenamiento} & \textbf{Prueba} \\
+\midrule
+Pérdida (Loss) & 0.1057 & 2.1850 \\
+Precisión (Accuracy) & 96.63\% & 68.00\% \\
+\midrule
+\textbf{Diferencia} & \multicolumn{2}{c}{\textbf{28.63\%}} \\
+\bottomrule
+\end{tabular}
+\label{tab:metrics}
+\end{table}
+
+\subsection{Curvas de Aprendizaje}
+
+La Figura \ref{fig:training_curves} muestra las curvas de pérdida y precisión durante el entrenamiento. Se observa claramente una divergencia significativa entre las métricas de entrenamiento y validación:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{plots/training_curves.png}
+\caption{Curvas de entrenamiento y validación. Panel superior: pérdida (loss) a lo largo de 25 épocas. Panel inferior: precisión (accuracy) durante el entrenamiento.}
+\label{fig:training_curves}
+\end{figure}
+
+\subsubsection{Análisis de las Curvas}
+
+Las curvas revelan características típicas de sobreajuste:
+
+\begin{enumerate}
+    \item \textbf{Pérdida de Entrenamiento}: Disminución consistente de 0.993 a 0.106
+    \item \textbf{Pérdida de Validación}: Disminución inicial hasta época 3 (0.839), seguida de incremento progresivo hasta 2.185
+    \item \textbf{Precisión de Entrenamiento}: Incremento sostenido hasta 96.63\%
+    \item \textbf{Precisión de Validación}: Estancamiento alrededor del 68\% después de época 5
+\end{enumerate}
+
+La divergencia entre las curvas de entrenamiento y validación comienza aproximadamente en la época 5-6, indicando que el modelo comenzó a memorizar patrones específicos del conjunto de entrenamiento en lugar de aprender características generalizables.
+
+\subsection{Métricas Finales Detalladas}
+
+La Figura \ref{fig:final_metrics} presenta una comparación visual de las métricas finales entre entrenamiento y prueba:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{plots/final_metrics.png}
+\caption{Comparación de métricas finales entre conjuntos de entrenamiento y prueba. Se evidencia la brecha significativa de 28.63\% en precisión.}
+\label{fig:final_metrics}
+\end{figure}
+
+\section{Análisis del Sobreajuste}
+
+\subsection{Diagnóstico del Problema}
+
+El modelo presenta sobreajuste severo, caracterizado por:
+
+\begin{itemize}
+    \item \textbf{Brecha de precisión}: 28.63\% entre entrenamiento (96.63\%) y validación (68\%)
+    \item \textbf{Brecha de pérdida}: Factor de 20.7× entre training loss (0.106) y test loss (2.185)
+    \item \textbf{Tendencia divergente}: Pérdida de validación creciente después de época 5
+\end{itemize}
+
+\subsection{Factores Contribuyentes}
+
+\subsubsection{Arquitectura Excesivamente Compleja}
+
+La principal causa del sobreajuste identificada es la arquitectura con \textbf{dos capas ocultas} (512 y 256 neuronas). Con 1.7 millones de parámetros para solo 20,000 ejemplos de entrenamiento, el modelo tiene una capacidad excesiva:
+
+\begin{equation}
+\text{Ratio} = \frac{\text{Parámetros}}{\text{Ejemplos}} = \frac{1,705,732}{20,000} = 85.29
+\end{equation}
+
+Este ratio extremadamente alto (85 parámetros por ejemplo) permitió al modelo memorizar características idiosincrásicas del conjunto de entrenamiento.
+
+\subsubsection{Arquitectura Recomendada}
+
+Para este problema, una arquitectura más apropiada habría sido:
+
+\begin{itemize}
+    \item \textbf{Una sola capa oculta}: 3072 → 256 → 4
+    \item \textbf{Parámetros totales}: $\sim$788,000 (reducción del 54\%)
+    \item \textbf{Técnicas de regularización}: Dropout (p=0.3-0.5) entre capas
+\end{itemize}
+
+\subsubsection{Limitaciones de la Función de Activación}
+
+Se utilizó exclusivamente la función ReLU (Rectified Linear Unit):
+
+\begin{equation}
+\text{ReLU}(x) = \max(0, x)
+\end{equation}
+
+La falta de experimentación con otras funciones de activación limitó la exploración del espacio de soluciones. Alternativas que podrían haber mejorado el rendimiento:
+
+\begin{itemize}
+    \item \textbf{Leaky ReLU}: Previene neuronas muertas
+    \item \textbf{ELU} (Exponential Linear Unit): Mejor normalización de activaciones
+    \item \textbf{SELU} (Scaled ELU): Auto-normalización para redes profundas
+    \item \textbf{Swish/SiLU}: Mejora el flujo de gradientes
+\end{itemize}
+
+\subsubsection{Ausencia de Regularización}
+
+No se implementaron técnicas de regularización estándar:
+
+\begin{itemize}
+    \item \textbf{Dropout}: Hubiera reducido co-adaptación de neuronas
+    \item \textbf{Weight Decay (L2)}: Hubiera penalizado pesos grandes
+    \item \textbf{Early Stopping}: Detener entrenamiento en época 5-6
+    \item \textbf{Data Augmentation}: Aumentar variabilidad del dataset
+\end{itemize}
+
+\section{Evaluación en Producción}
+
+\subsection{Implementación del Sistema}
+
+Se desarrolló un sistema completo de clasificación con:
+
+\begin{itemize}
+    \item \textbf{Backend}: FastAPI con endpoint de predicción
+    \item \textbf{Frontend}: Interfaz web para subir imágenes
+    \item \textbf{Deployment}: Arquitectura basada en Docker
+\end{itemize}
+
+\subsection{Rendimiento Observado en Producción}
+
+A pesar de las métricas de validación deficientes, el modelo demostró un rendimiento sorprendentemente competente al clasificar imágenes en el entorno de producción. Se evaluaron 40 imágenes de muestra distribuidas entre las cuatro clases, y el modelo consistentemente clasificó correctamente las imágenes.
+
+\subsubsection{Ejemplos de Clasificaciones Correctas}
+
+Las imágenes de prueba, almacenadas en el directorio \texttt{data/sample\_images/}, fueron procesadas exitosamente:
+
+\begin{itemize}
+    \item \textbf{Airplanes}: 10 imágenes correctamente clasificadas (10301, 13060, 18424, 2451, 27901, 32346, 36389, 4683, 47336, 24492)
+    \item \textbf{Automobiles}: 10 imágenes correctamente clasificadas (11646, 14716, 20497, 20843, 22936, 28643, 32860, 33772, 6813, 8221)
+    \item \textbf{Ships}: 10 imágenes correctamente clasificadas (16558, 18125, 19131, 3169, 33459, 44822, 47609, 5985, 7061, 9722)
+    \item \textbf{Trucks}: 10 imágenes correctamente clasificadas (12608, 15252, 17918, 18030, 22925, 31538, 37629, 39884, 49398, 6457)
+\end{itemize}
+
+\subsubsection{Pruebas con Interfaz Web}
+
+Adicionalmente, se realizaron pruebas prácticas utilizando la interfaz web desarrollada (frontend + backend FastAPI). Las Figuras \ref{fig:test_u1} a \ref{fig:test_u4} muestran capturas de pantalla de predicciones realizadas mediante la aplicación web, donde el usuario sube una imagen y el sistema retorna la clasificación con su nivel de confianza.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{u1.jpeg}
+\caption{Prueba de clasificación mediante interfaz web - Ejemplo 1}
+\label{fig:test_u1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{u2.jpeg}
+\caption{Prueba de clasificación mediante interfaz web - Ejemplo 2}
+\label{fig:test_u2}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{u3.jpeg}
+\caption{Prueba de clasificación mediante interfaz web - Ejemplo 3}
+\label{fig:test_u3}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{u4.jpeg}
+\caption{Prueba de clasificación mediante interfaz web - Ejemplo 4}
+\label{fig:test_u4}
+\end{figure}
+
+Estas pruebas demuestran que el sistema completo (frontend, backend y modelo) funciona correctamente en un entorno de producción real, permitiendo a los usuarios subir imágenes y obtener predicciones instantáneas. La interfaz muestra tanto la clase predicha como las probabilidades para cada una de las cuatro categorías, proporcionando transparencia en el proceso de clasificación.
+
+\subsection{Explicación de la Paradoja}
+
+La aparente contradicción entre las métricas de validación pobres (68\%) y el buen rendimiento en producción puede explicarse por:
+
+\subsubsection{Alta Separabilidad entre Clases}
+
+Las cuatro clases seleccionadas presentan características visuales altamente distintivas:
+
+\begin{itemize}
+    \item \textbf{Airplanes}: Cielo de fondo, siluetas aerodinámicas, alas prominentes
+    \item \textbf{Automobiles}: Ángulos característicos, ruedas visibles, proporciones específicas
+    \item \textbf{Ships}: Ambientes acuáticos, estructuras horizontales
+    \item \textbf{Trucks}: Perfiles angulares, cabinas distintivas, mayor tamaño aparente
+\end{itemize}
+
+Esta separabilidad natural permitió al modelo, a pesar del sobreajuste, capturar fronteras de decisión suficientemente robustas para las características más prominentes de cada clase.
+
+\subsubsection{Distribución de Datos en Producción}
+
+Las imágenes de prueba en producción probablemente representaron casos "típicos" de cada clase, similares a los ejemplos más comunes en el conjunto de entrenamiento. El modelo, aunque sobreajustado, logró memorizar correctamente las características de estos casos prototípicos.
+
+\section{Discusión}
+
+\subsection{Calidad del Modelo: Perspectivas Diferentes}
+
+Este trabajo revela una importante distinción entre dos métricas de éxito en aprendizaje automático:
+
+\subsubsection{Desde la Perspectiva de Machine Learning}
+
+Bajo criterios técnicos estándar, \textbf{el modelo es deficiente}:
+
+\begin{itemize}
+    \item Brecha excesiva entre entrenamiento y validación
+    \item Pérdida de validación creciente (señal clara de sobreajuste)
+    \item Incapacidad de generalización demostrada por métricas
+    \item Violación de principios de diseño de arquitectura
+\end{itemize}
+
+\subsubsection{Desde la Perspectiva de Ingeniería de Producción}
+
+Si el criterio final es el \textbf{rendimiento en el sistema desplegado}, la práctica fue exitosa:
+
+\begin{itemize}
+    \item Clasificaciones correctas consistentes en producción
+    \item Sistema funcional de extremo a extremo
+    \item Experiencia de usuario satisfactoria
+    \item Cumplimiento del objetivo de negocio
+\end{itemize}
+
+\subsection{Implicaciones Prácticas}
+
+Este caso ilustra que:
+
+\begin{enumerate}
+    \item \textbf{Las métricas de validación no siempre predicen rendimiento real}: Para problemas con clases altamente separables, incluso modelos sobreajustados pueden funcionar aceptablemente.
+    
+    \item \textbf{La simplicidad del problema importa}: En tareas de clasificación con clases visualmente distintivas, arquitecturas simples pueden ser suficientes.
+    
+    \item \textbf{El contexto define el éxito}: Para aplicaciones críticas (medicina, seguridad), un modelo con estas características sería inaceptable. Para una aplicación de demostración educativa, puede ser suficiente.
+\end{enumerate}
+
+\subsection{Mejoras Recomendadas}
+
+Para trabajos futuros, se recomienda:
+
+\subsubsection{Mejoras Arquitectónicas}
+
+\begin{itemize}
+    \item Reducir a una sola capa oculta (3072 → 256 → 4)
+    \item Implementar Dropout con $p \in [0.3, 0.5]$
+    \item Aplicar Batch Normalization para estabilizar entrenamiento
+    \item Considerar arquitecturas CNN, más apropiadas para imágenes
+\end{itemize}
+
+\subsubsection{Experimentación Sistemática}
+
+\begin{itemize}
+    \item \textbf{Funciones de activación}: Comparar ReLU, Leaky ReLU, ELU, SELU, Swish
+    \item \textbf{Regularización}: L1, L2, Elastic Net con diferentes $\lambda$
+    \item \textbf{Optimizadores}: SGD con momentum, AdaGrad, RMSprop
+    \item \textbf{Learning rate schedules}: Cosine annealing, reducción en plateau
+\end{itemize}
+
+\subsubsection{Técnicas de Prevención de Sobreajuste}
+
+\begin{itemize}
+    \item \textbf{Early Stopping}: Monitorizar validación y detener cuando pérdida aumente
+    \item \textbf{Data Augmentation}: Rotaciones, flips, zoom, cambios de brillo
+    \item \textbf{Cross-validation}: K-fold para validación más robusta
+    \item \textbf{Ensemble methods}: Combinar múltiples modelos
+\end{itemize}
+
+\subsubsection{Evaluación Más Rigurosa}
+
+\begin{itemize}
+    \item Matriz de confusión detallada por clase
+    \item Métricas adicionales: F1-score, precisión, recall por clase
+    \item Análisis de ejemplos mal clasificados
+    \item Curvas ROC y AUC para cada clase
+\end{itemize}
+
+\section{Conclusiones}
+
+Esta práctica proporcionó insights valiosos sobre el fenómeno del sobreajuste y la relación entre métricas de validación y rendimiento en producción:
+
+\begin{enumerate}
+    \item \textbf{Sobreajuste Severo Documentado}: El modelo exhibió sobreajuste clásico con 28.63\% de brecha en precisión, atribuible principalmente a una arquitectura excesivamente compleja con dos capas ocultas.
+    
+    \item \textbf{Paradoja de Rendimiento}: A pesar de métricas de validación deficientes (68\%), el modelo demostró buen rendimiento en producción, clasificando correctamente imágenes reales debido a la alta separabilidad entre las clases seleccionadas.
+    
+    \item \textbf{Limitaciones Metodológicas}: La falta de experimentación con múltiples funciones de activación, técnicas de regularización y arquitecturas alternativas limitó el potencial del modelo.
+    
+    \item \textbf{Lecciones sobre Arquitectura}: Con 85 parámetros por ejemplo de entrenamiento, se confirma que una sola capa oculta habría sido más apropiada para este problema.
+    
+    \item \textbf{Contexto en la Evaluación}: Este trabajo demuestra que el "éxito" de un modelo debe definirse según el contexto de aplicación: las métricas técnicas son cruciales para validación científica, pero el rendimiento en producción define la utilidad práctica.
+    
+    \item \textbf{Importancia de la Experimentación}: El trabajo futuro debe incluir búsqueda sistemática de hiperparámetros, comparación de funciones de activación, y entrenamiento de múltiples modelos con diferentes configuraciones.
+\end{enumerate}
+
+En resumen, aunque desde una perspectiva estricta de machine learning el modelo presenta deficiencias significativas, desde una perspectiva de ingeniería práctica cumplió su objetivo en el contexto específico de clasificación de cuatro clases altamente separables. Esta dualidad subraya la importancia de considerar tanto la rigurosidad técnica como los requisitos prácticos al evaluar sistemas de aprendizaje automático.
+
+\section*{Lecciones Aprendidas}
+
+\begin{itemize}
+    \item La complejidad del modelo debe estar alineada con la complejidad del problema
+    \item El sobreajuste puede manifestarse fuertemente incluso con datasets moderados
+    \item Las métricas de validación son indicadores esenciales pero no únicos del éxito
+    \item La experimentación sistemática es crucial para encontrar configuraciones óptimas
+    \item La separabilidad de clases puede compensar parcialmente limitaciones arquitectónicas
+    \item El contexto de aplicación determina qué constituye un modelo "suficientemente bueno"
+\end{itemize}
+
+\section*{Agradecimientos}
+
+Agradezco a la Universidad de Guanajuato y al Departamento de DICIS por proporcionar los recursos y el ambiente académico necesario para la realización de este proyecto educativo.
+
+\begin{thebibliography}{00}
+\bibitem{krizhevsky2009learning} A. Krizhevsky and G. Hinton, ``Learning multiple layers of features from tiny images,'' Technical Report, University of Toronto, 2009.
+
+\bibitem{goodfellow2016deep} I. Goodfellow, Y. Bengio, and A. Courville, ``Deep Learning,'' MIT Press, 2016.
+
+\bibitem{srivastava2014dropout} N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever, and R. Salakhutdinov, ``Dropout: A simple way to prevent neural networks from overfitting,'' Journal of Machine Learning Research, vol. 15, pp. 1929-1958, 2014.
+
+\bibitem{prechelt1998early} L. Prechelt, ``Early stopping - but when?,'' in Neural Networks: Tricks of the Trade, Springer, 1998, pp. 55-69.
+
+\bibitem{ioffe2015batch} S. Ioffe and C. Szegedy, ``Batch normalization: Accelerating deep network training by reducing internal covariate shift,'' in Proc. International Conference on Machine Learning (ICML), 2015, pp. 448-456.
+
+\bibitem{ramachandran2017swish} P. Ramachandran, B. Zoph, and Q. V. Le, ``Searching for activation functions,'' arXiv preprint arXiv:1710.05941, 2017.
+
+\bibitem{lecun1998gradient} Y. LeCun, L. Bottou, Y. Bengio, and P. Haffner, ``Gradient-based learning applied to document recognition,'' Proceedings of the IEEE, vol. 86, no. 11, pp. 2278-2324, 1998.
+
+\bibitem{kingma2014adam} D. P. Kingma and J. Ba, ``Adam: A method for stochastic optimization,'' arXiv preprint arXiv:1412.6980, 2014.
+
+\end{thebibliography}
+
+\end{document}
